@@ -7,5 +7,5 @@ import { registerAs } from "@nestjs/config";
 
 export default registerAs('email', () => ({
   provider: 'console',
-  from: process.env.EMAIL_FROM || 'test@example.com',
+  from: process.env.EMAIL_FROM || 'juan@example.com',
 }));
