@@ -1,9 +1,11 @@
 import { registerAs } from "@nestjs/config";
 
+/**
+ * Configuración para el servicio de email.
+ * Actualmente utilizando solo la consola para pruebas.
+ */
 
-// Temporal (Aun no definido como realizarlo)
 export default registerAs('email', () => ({
-    provider: process.env.EMAIL_PROVIDER || 'sendgrid',
-    apiKey: process.env.EMAIL_API_KEY || 'your-api-key',
-    from: process.env.EMAIL_FROM || 'no-reply@example.com',
-  }));
+  provider: 'console',
+  from: process.env.EMAIL_FROM || 'test@example.com',
+}));

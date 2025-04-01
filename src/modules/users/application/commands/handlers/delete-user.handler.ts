@@ -3,6 +3,9 @@ import { Inject } from '@nestjs/common';
 import { DeleteUserCommand } from '../delete-user.command';
 import { UserRepositoryPort, USER_REPOSITORY } from '../../ports/user-repository.port';
 
+
+//** Maneja la eliminación de un usuario. */
+//** Este comando se encarga de eliminar un usuario del sistema. */
 @CommandHandler(DeleteUserCommand)
 export class DeleteUserHandler implements ICommandHandler<DeleteUserCommand> {
   constructor(

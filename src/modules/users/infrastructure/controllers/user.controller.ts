@@ -1,6 +1,6 @@
-import {Body, Controller, Get, HttpCode, HttpStatus, Param, Post} from '@nestjs/common';
+import {Body, Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards, Put, Delete} from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-//import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard'; Falta crear 
+import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { CreateUserDto } from '../../application/dtos/create-user.dto';
 import { UpdateUserDto } from '../../application/dtos/update-user.dto';
 import { UserResponseDto } from '../../application/dtos/user-response.dto';
@@ -8,7 +8,7 @@ import { CreateUserCommand } from '../../application/commands/create-user.comman
 import { UpdateUserCommand } from '../../application/commands/update-user.command';
 import { DeleteUserCommand } from '../../application/commands/delete-user.command';
 import { GetUserQuery } from '../../application/queries/get-user.query';
-import { GetUsersQuery } from '../../application/queries/get-users.query';
+import { GetUsersQuery } from '../../application/queries/get-users.query'
 
 
 @Controller('users')
@@ -30,7 +30,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   async findAll(): Promise<UserResponseDto[]> {
     const users = await this.queryBus.execute(new GetUsersQuery());
-    return users.map(user => UserResponseDto.fromDomain(user));
+    return users.map((user: any) => UserResponseDto.fromDomain(user));
   }
 
   @Get(':id')

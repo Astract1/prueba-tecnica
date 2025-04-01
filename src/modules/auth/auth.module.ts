@@ -7,6 +7,12 @@ import { AuthService } from './application/services/auth.service';
 import { JwtStrategy } from './infrastructure/adapters/jwt/jwt.strategy';
 import { AuthController } from './infrastructure/controllers/auth.controller';
 
+
+/**
+ * Módulo de autenticación.
+ * Proporciona servicios de autenticación y autorización utilizando JWT.
+ */
+
 @Module({
     imports: [
       UsersModule,

@@ -7,40 +7,41 @@ import { UserRepositoryPort, USER_REPOSITORY } from "../../ports/user-repository
 import { NotificationPort, NOTIFICATION_SERVICE } from "../../ports/notification.port";
 import { UserCreatedEvent } from "src/modules/users/domain/events/user-created.event";
 
-
-
-@CommandHandler(UpdateUserCommand)
-export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
+//** Maneja la creación de un nuevo usuario. */
+//** Este comando se encarga de crear un nuevo usuario en el sistema, cifrar su contraseña y enviar una notificación. */
+@CommandHandler(CreateUserCommand)
+export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   constructor(
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepositoryPort,
     @Inject(NOTIFICATION_SERVICE)
     private readonly notificationService: NotificationPort,
+    private readonly eventBus: EventBus,
   ) {}
 
-  async execute(command: UpdateUserCommand): Promise<User> {
-    const { id, updateUserDto } = command;
+  async execute(command: CreateUserCommand): Promise<User> {
+    const { createUserDto } = command;
     
-    // Buscar usuario existente
-    const user = await this.userRepository.findById(id);
+    // Cifrar contraseña Haseada
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     
-    // Actualizar campos
-    const updates: any = { ...updateUserDto };
+    // Crear nueva instancia de usuario
+    const user = new User({
+      email: createUserDto.email,
+      password: hashedPassword,
+      firstName: createUserDto.firstName,
+      lastName: createUserDto.lastName,
+    });
     
-    // Si hay password, encriptarlo
-    if (updates.password) {
-      updates.password = await bcrypt.hash(updates.password, 10);
-    }
+    // Guardar usuario
+    const savedUser = await this.userRepository.create(user);
     
-    // Actualizar el usuario
-    user.update(updates);
-    
-    // Guardar cambios
-    const updatedUser = await this.userRepository.update(user);
+    // Publicar evento
+    this.eventBus.publish(new UserCreatedEvent(savedUser.id));
     
     // Enviar notificación
-    await this.notificationService.sendUserUpdatedNotification(updatedUser);
-    
-    return updatedUser;
+    await this.notificationService.sendUserCreatedNotification(savedUser);
+    //Returnar el usuario creado
+    return savedUser;
   }
 }
