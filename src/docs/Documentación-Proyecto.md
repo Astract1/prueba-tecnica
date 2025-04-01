@@ -530,6 +530,11 @@ EMAIL_FROM=noreply@example.com
 # Instalar dependencias
 npm install
 
+# Ejecutar docker para la base de datos
+docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=user_management -p 5432:5432 -d postgres
+
+
+
 # Ejecutar en modo desarrollo
 npm run start:dev
 
@@ -539,4 +544,579 @@ npm run build
 # Ejecutar en modo producción
 npm run start:prod
 
+```
+
+
+
+## 6.4 Ejecución en Sistemas Windows 
+
+
+*Crear Usuario* 
+
+```powershell
+
+
+
+$body = @{
+    email = "usuario@ejemplo.com"
+    password = "contraseña123"
+    firstName = "Nombre"
+    lastName = "Apellido"
+} | ConvertTo-Json
+
+Invoke-WebRequest -Uri "http://localhost:3000/users" -Method POST -ContentType "application/json" -Body $body
+
+```
+
+*Iniciar Sesión* 
+
+```powershell
+$body = @{
+    email = "usuario@ejemplo.com"
+    password = "contraseña123"
+} | ConvertTo-Json
+
+$response = Invoke-RestMethod -Uri "http://localhost:3000/auth/login" -Method POST -ContentType "application/json" -Body $body
+
+$global:token = $response.accessToken
+
+
+Write-Host "Token obtenido: $($token.Substring(0, [Math]::Min(20, $token.Length)))..." -ForegroundColor Green
+```
+
+*Listar Usuarios* 
+
+
+***Nota**: Llegados a este punto debes estar logueado como indica el paso anterior para que los demas pasos funcionen correctamente.
+
+
+```powershell
+
+$headers = @{
+    "Authorization" = "Bearer $token"
+}
+
+Invoke-WebRequest -Uri "http://localhost:3000/users" -Method GET -Headers $headers
+
+```
+
+*Obtener detalles de los usuarios* 
+
+
+```powershell
+
+# Configurar headers con el token de autenticación
+$headers = @{
+    "Authorization" = "Bearer $token"
+}
+
+
+$users = Invoke-RestMethod -Uri "http://localhost:3000/users" -Method GET -Headers $headers
+
+# Mostrar los usuarios disponibles
+Write-Host "Usuarios disponibles:" -ForegroundColor Cyan
+$users | ForEach-Object {
+    Write-Host "ID: $($_.id), Email: $($_.email)" -ForegroundColor Yellow
+}
+
+$userId = Read-Host "Ingresa el ID del usuario que deseas ver"
+
+# Obtener detalles del usuario específico
+try {
+    $userDetails = Invoke-RestMethod -Uri "http://localhost:3000/users/$userId" -Method GET -Headers $headers
+    
+    # Mostrar detalles del usuario
+    Write-Host "Detalles del usuario:" -ForegroundColor Green
+    $userDetails | Format-List
+}
+catch {
+    Write-Host "Error al obtener detalles del usuario:" -ForegroundColor Red
+    Write-Host "Código de estado: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Yellow
+    Write-Host "Mensaje de error: $($_.Exception.Message)" -ForegroundColor Yellow
+    
+
+    $errorDetails = $_.ErrorDetails.Message
+    if ($errorDetails) {
+        Write-Host "Detalles del error: $errorDetails" -ForegroundColor Red
+    }
+}
+```
+
+
+
+*Actualizar Usuarios* 
+
+```powershell
+
+# Configurar headers con el token de autenticación
+$headers = @{
+    "Authorization" = "Bearer $token"
+}
+
+# Listar usuarios para obtener los IDs disponibles
+$users = Invoke-RestMethod -Uri "http://localhost:3000/users" -Method GET -Headers $headers
+
+# Mostrar los usuarios disponibles
+Write-Host "Usuarios disponibles:" -ForegroundColor Cyan
+$users | ForEach-Object {
+    Write-Host "ID: $($_.id), Email: $($_.email)" -ForegroundColor Yellow
+}
+
+# Solicitar el ID del usuario que quieres actualizar
+do {
+    $userId = Read-Host "Ingresa el ID del usuario que deseas actualizar"
+    
+    # Validar que el ID no esté vacío
+    if ([string]::IsNullOrWhiteSpace($userId)) {
+        Write-Host "El ID no puede estar vacío. Inténtalo de nuevo." -ForegroundColor Red
+        continue
+    }
+    
+    # Validar que el ID exista en la lista de usuarios
+    $userExists = $users | Where-Object { $_.id -eq $userId }
+    if ($userExists) {
+        break
+    }
+    else {
+        Write-Host "ID de usuario no válido. Inténtalo de nuevo." -ForegroundColor Red
+    }
+} while ($true)
+
+# Definir los datos de actualización
+$updateData = @{}
+
+# Solicitar nuevos valores
+$firstName = Read-Host "Nuevo nombre (deja en blanco para no cambiar)"
+$lastName = Read-Host "Nuevo apellido (deja en blanco para no cambiar)"
+$email = Read-Host "Nuevo email (deja en blanco para no cambiar)"
+$password = Read-Host "Nueva contraseña (deja en blanco para no cambiar)"
+
+# Agregar campos solo si no están vacíos
+if ($firstName) { $updateData.firstName = $firstName }
+if ($lastName) { $updateData.lastName = $lastName }
+if ($email) { $updateData.email = $email }
+if ($password) { 
+    if ($password.Length -lt 8) {
+        Write-Host "Error: La contraseña debe tener al menos 8 caracteres" -ForegroundColor Red
+        return
+    }
+    $updateData.password = $password 
+}
+
+# Convertir a JSON
+$updateBody = $updateData | ConvertTo-Json
+
+# Mostrar lo que se va a enviar
+Write-Host "Datos a enviar:" -ForegroundColor Cyan
+$updateBody
+
+# Actualizar usuario
+try {
+    $updatedUser = Invoke-RestMethod -Uri "http://localhost:3000/users/$userId" -Method PUT -Headers $headers -ContentType "application/json" -Body $updateBody
+    
+    Write-Host "Usuario actualizado exitosamente:" -ForegroundColor Green
+    $updatedUser | Format-List
+}
+catch {
+    Write-Host "Error al actualizar usuario:" -ForegroundColor Red
+    
+    # Imprimir detalles completos del error
+    Write-Host "Excepción completa:" -ForegroundColor Yellow
+    $_ | Format-List * -Force
+    
+    # Intentar extraer más detalles del error
+    if ($_.Exception.Response) {
+        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        $reader.BaseStream.Position = 0
+        $reader.DiscardBufferedData()
+        $responseBody = $reader.ReadToEnd()
+        Write-Host "Cuerpo de la respuesta de error:" -ForegroundColor Yellow
+        Write-Host $responseBody
+    }
+}
+
+```
+
+
+*Eliminar Usuarios* 
+
+
+```powershell
+# Configurar headers con el token de autenticación
+$headers = @{
+    "Authorization" = "Bearer $token"
+}
+
+# Listar usuarios para obtener los IDs disponibles
+$users = Invoke-RestMethod -Uri "http://localhost:3000/users" -Method GET -Headers $headers
+
+# Mostrar los usuarios disponibles
+Write-Host "Usuarios disponibles:" -ForegroundColor Cyan
+$users | ForEach-Object {
+    Write-Host "ID: $($_.id), Email: $($_.email)" -ForegroundColor Yellow
+}
+
+# Solicitar el ID del usuario que quieres eliminar
+$userId = Read-Host "Ingresa el ID del usuario que deseas eliminar"
+
+# Confirmar eliminación
+$confirmacion = Read-Host "¿Estás seguro de que deseas eliminar el usuario $userId? (s/n)"
+
+if ($confirmacion -eq "s") {
+    try {
+        # Eliminar usuario
+        $response = Invoke-RestMethod -Uri "http://localhost:3000/users/$userId" -Method DELETE -Headers $headers
+        
+        Write-Host "Usuario eliminado exitosamente" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Error al eliminar usuario:" -ForegroundColor Red
+        Write-Host "Código de estado: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Yellow
+        Write-Host "Mensaje de error: $($_.Exception.Message)" -ForegroundColor Yellow
+        
+        $errorDetails = $_.ErrorDetails.Message
+        if ($errorDetails) {
+            Write-Host "Detalles del error: $errorDetails" -ForegroundColor Red
+        }
+    }
+}
+else {
+    Write-Host "Eliminación cancelada" -ForegroundColor Yellow
+}
+
+```
+
+
+
+*Script General de Funcionamiento* 
+
+***Nota** El codigo no tiene Verificaciones Implementadas
+Se crea un archivo con el nombre que desees y los ejecutas como powershell
+
+```powershell
+
+# Configuracion
+$baseUrl = "http://localhost:3000"
+$token = $null
+$currentUserId = $null
+
+# Funcion para mostrar el menu principal
+function Show-Menu {
+    Clear-Host
+    Write-Host "===== PRUEBA DE API DE GESTION DE USUARIOS =====" -ForegroundColor Cyan
+    Write-Host
+    Write-Host "Estado actual:" -ForegroundColor Yellow
+    if ($token) {
+        Write-Host " * Estado de autenticacion: Autenticado" -ForegroundColor Green
+    } else {
+        Write-Host " * Estado de autenticacion: No autenticado" -ForegroundColor Red
+    }
+    if ($currentUserId) {
+        Write-Host " * ID de usuario seleccionado: $currentUserId" -ForegroundColor Green
+    } else {
+        Write-Host " * ID de usuario seleccionado: Ninguno" -ForegroundColor Red
+    }
+    Write-Host
+    Write-Host "OPCIONES:"
+    Write-Host "1. Crear usuario nuevo"
+    Write-Host "2. Iniciar sesion (login)"
+    Write-Host "3. Listar todos los usuarios"
+    Write-Host "4. Ver detalles de un usuario"
+    Write-Host "5. Actualizar usuario"
+    Write-Host "6. Eliminar usuario"
+    Write-Host "7. Seleccionar ID de usuario"
+    Write-Host 
+    Write-Host "0. Salir"
+    Write-Host
+}
+
+# Funcion para crear un nuevo usuario
+function Create-User {
+    Write-Host "===== CREAR NUEVO USUARIO =====" -ForegroundColor Cyan
+    
+    $email = Read-Host "Email"
+    $password = Read-Host "Password"
+    $firstName = Read-Host "Nombre"
+    $lastName = Read-Host "Apellido"
+    
+    $body = @{
+        email = $email
+        password = $password
+        firstName = $firstName
+        lastName = $lastName
+    } | ConvertTo-Json
+    
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/users" -Method POST -ContentType "application/json" -Body $body
+        $user = $response.Content | ConvertFrom-Json
+        
+        Write-Host "Usuario creado exitosamente!" -ForegroundColor Green
+        Write-Host "ID: $($user.id)" -ForegroundColor Yellow
+        Write-Host "Email: $($user.email)"
+        Write-Host "Nombre: $($user.firstName) $($user.lastName)"
+        Write-Host "Deseas seleccionar este usuario? (s/n)"
+        $select = Read-Host
+        if ($select -eq "s") {
+            $script:currentUserId = $user.id
+        }
+    }
+    catch {
+        Write-Host "Error al crear usuario: $_" -ForegroundColor Red
+        Write-Host $_.Exception.Response
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Funcion para iniciar sesion
+function Login {
+    Write-Host "===== INICIAR SESION =====" -ForegroundColor Cyan
+    
+    $email = Read-Host "Email"
+    $password = Read-Host "Password"
+    
+    $body = @{
+        email = $email
+        password = $password
+    } | ConvertTo-Json
+    
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/auth/login" -Method POST -ContentType "application/json" -Body $body
+        $result = $response.Content | ConvertFrom-Json
+        $script:token = $result.accessToken
+        
+        Write-Host "Inicio de sesion exitoso!" -ForegroundColor Green
+        Write-Host "Token JWT obtenido (primeros 20 caracteres): $($token.Substring(0, [Math]::Min(20, $token.Length)))..." -ForegroundColor Yellow
+    }
+    catch {
+        Write-Host "Error al iniciar sesion: $_" -ForegroundColor Red
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Funcion para listar todos los usuarios
+function List-Users {
+    Write-Host "===== LISTAR USUARIOS =====" -ForegroundColor Cyan
+    
+    if (-not $token) {
+        Write-Host "Necesitas iniciar sesion primero (opcion 2)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    try {
+        $headers = @{
+            "Authorization" = "Bearer $token"
+        }
+        
+        $response = Invoke-WebRequest -Uri "$baseUrl/users" -Method GET -Headers $headers
+        $users = $response.Content | ConvertFrom-Json
+        
+        if ($users.Count -eq 0) {
+            Write-Host "No hay usuarios registrados" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "Usuarios encontrados: $($users.Count)" -ForegroundColor Green
+            
+            foreach ($user in $users) {
+                Write-Host "----------------------------------------"
+                Write-Host "ID: $($user.id)" -ForegroundColor Yellow
+                Write-Host "Email: $($user.email)"
+                Write-Host "Nombre: $($user.firstName) $($user.lastName)"
+                Write-Host "Estado: $(if ($user.isActive) { 'Activo' } else { 'Inactivo' })"
+                Write-Host "Creado: $($user.createdAt)"
+                Write-Host "Seleccionar este usuario? (s/n)"
+                $select = Read-Host
+                if ($select -eq "s") {
+                    $script:currentUserId = $user.id
+                    Write-Host "Usuario seleccionado: $($script:currentUserId)" -ForegroundColor Green
+                    break
+                }
+            }
+        }
+    }
+    catch {
+        Write-Host "Error al listar usuarios: $_" -ForegroundColor Red
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Funcion para ver detalles de un usuario
+function Get-UserDetails {
+    Write-Host "===== VER DETALLES DE USUARIO =====" -ForegroundColor Cyan
+    
+    if (-not $token) {
+        Write-Host "Necesitas iniciar sesion primero (opcion 2)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    if (-not $currentUserId) {
+        Write-Host "Necesitas seleccionar un usuario primero (opcion 7)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    try {
+        $headers = @{
+            "Authorization" = "Bearer $token"
+        }
+        
+        $response = Invoke-WebRequest -Uri "$baseUrl/users/$currentUserId" -Method GET -Headers $headers
+        $user = $response.Content | ConvertFrom-Json
+        
+        Write-Host "Detalles del usuario:" -ForegroundColor Green
+        Write-Host "ID: $($user.id)" -ForegroundColor Yellow
+        Write-Host "Email: $($user.email)"
+        Write-Host "Nombre: $($user.firstName) $($user.lastName)"
+        Write-Host "Estado: $(if ($user.isActive) { 'Activo' } else { 'Inactivo' })"
+        Write-Host "Creado: $($user.createdAt)"
+        Write-Host "Actualizado: $($user.updatedAt)"
+    }
+    catch {
+        Write-Host "Error al obtener detalles del usuario: $_" -ForegroundColor Red
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Funcion para actualizar un usuario
+function Update-UserInfo {
+    Write-Host "===== ACTUALIZAR USUARIO =====" -ForegroundColor Cyan
+    
+    if (-not $token) {
+        Write-Host "Necesitas iniciar sesion primero (opcion 2)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    if (-not $currentUserId) {
+        Write-Host "Necesitas seleccionar un usuario primero (opcion 7)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    Write-Host "Deja en blanco los campos que no deseas modificar"
+    $firstName = Read-Host "Nuevo nombre"
+    $lastName = Read-Host "Nuevo apellido"
+    $email = Read-Host "Nuevo email"
+    $password = Read-Host "Nueva password"
+    
+    $body = @{}
+    
+    if ($firstName) { $body.firstName = $firstName }
+    if ($lastName) { $body.lastName = $lastName }
+    if ($email) { $body.email = $email }
+    if ($password) { $body.password = $password }
+    
+    if ($body.Count -eq 0) {
+        Write-Host "No se especificaron cambios" -ForegroundColor Yellow
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    $jsonBody = $body | ConvertTo-Json
+    
+    try {
+        $headers = @{
+            "Authorization" = "Bearer $token"
+        }
+        
+        $response = Invoke-WebRequest -Uri "$baseUrl/users/$currentUserId" -Method PUT -Headers $headers -ContentType "application/json" -Body $jsonBody
+        $user = $response.Content | ConvertFrom-Json
+        
+        Write-Host "Usuario actualizado exitosamente!" -ForegroundColor Green
+        Write-Host "ID: $($user.id)" -ForegroundColor Yellow
+        Write-Host "Email: $($user.email)"
+        Write-Host "Nombre: $($user.firstName) $($user.lastName)"
+    }
+    catch {
+        Write-Host "Error al actualizar usuario: $_" -ForegroundColor Red
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Funcion para eliminar un usuario
+function Remove-UserAccount {
+    Write-Host "===== ELIMINAR USUARIO =====" -ForegroundColor Cyan
+    
+    if (-not $token) {
+        Write-Host "Necesitas iniciar sesion primero (opcion 2)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    if (-not $currentUserId) {
+        Write-Host "Necesitas seleccionar un usuario primero (opcion 7)" -ForegroundColor Red
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    Write-Host "Estas seguro de que deseas eliminar el usuario con ID $currentUserId? (s/n)" -ForegroundColor Yellow
+    $confirm = Read-Host
+    
+    if ($confirm -ne "s") {
+        Write-Host "Operacion cancelada" -ForegroundColor Yellow
+        Read-Host "Presiona Enter para continuar"
+        return
+    }
+    
+    try {
+        $headers = @{
+            "Authorization" = "Bearer $token"
+        }
+        
+        $response = Invoke-WebRequest -Uri "$baseUrl/users/$currentUserId" -Method DELETE -Headers $headers
+        
+        Write-Host "Usuario eliminado exitosamente!" -ForegroundColor Green
+        $script:currentUserId = $null
+    }
+    catch {
+        Write-Host "Error al eliminar usuario: $_" -ForegroundColor Red
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Funcion para seleccionar ID de usuario manualmente
+function Select-UserById {
+    Write-Host "===== SELECCIONAR ID DE USUARIO =====" -ForegroundColor Cyan
+    
+    $id = Read-Host "Ingresa el ID del usuario"
+    
+    if ($id) {
+        $script:currentUserId = $id
+        Write-Host "ID de usuario seleccionado: $id" -ForegroundColor Green
+    }
+    else {
+        Write-Host "No se selecciono ningun ID" -ForegroundColor Yellow
+    }
+    
+    Read-Host "Presiona Enter para continuar"
+}
+
+# Bucle principal
+$option = ""
+while ($option -ne "0") {
+    Show-Menu
+    $option = Read-Host "Selecciona una opcion"
+    
+    switch ($option) {
+        "1" { Create-User }
+        "2" { Login }
+        "3" { List-Users }
+        "4" { Get-UserDetails }
+        "5" { Update-UserInfo }
+        "6" { Remove-UserAccount }
+        "7" { Select-UserById }
+        "0" { Write-Host "Hasta luego!" -ForegroundColor Cyan }
+        default { 
+            Write-Host "Opcion no valida, intenta de nuevo" -ForegroundColor Red
+            Read-Host "Presiona Enter para continuar"
+        }
+    }
+}
 ```
