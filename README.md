@@ -1,14 +1,177 @@
-# 1. Resumen General
+### Sistema de Gestión de Usuarios con Autenticación JWT
 
-Se siguió la estructura dada del proyecto, que es un sistema de gestión de usuarios con autenticación de JWT, utilizando NestJS como framework principal y siguiendo los principios de la arquitectura hexagonal y CQRS.
+Es la implementación de API RESTful con el Framework NestJs, usando la arquitectura hexagonal y el patron CQRS para serparar las operaciones de lectura y escritura
 
-# 2. El proyecto tenía como objetivo
+### 📋 Descrición general
 
-- Implementar autenticación mediante JWT.
-- Aplicar los conceptos de arquitectura Hexagonal.
-- Utilizar TypeORM para la persistencia de los datos.
+El proyecto implemeta un sistema de gestión de usuarios con autenticación usando JWT (Json Web Token), con los principios de la arquitectura hexagonal y el patron CQRS.
 
-# 3. Estructura Final del Proyecto
+### 🎯 Objetivos del proyecto
+
+* Implementa Autenticación mediante JWT
+* Aplicar los conceptos de la arquitectura Hexagonal
+* Utilizar el patron CQRS para separar las operaciones de lectura y escritura
+* Implementación del CRUD
+* Utlización de TypeORM para la persistencia de datos
+
+### 🏗️ Arquitectura
+
+El proyecto esta estructurado con la Arquitectura Hexagonal
+
+#### Capas Principales
+
+* ***Domain (Dominio)***: Contiene las entidades del negocio y reglas de dominio
+* ***Applitcation (Aplicación)***: Contiene los casos de uso de la aplicación ya sean comandos, consultas y puertos
+* ***Infrastructure (Infraestructura)***: Contiene los adaptadores,controladores y servicios externos
+
+ ### Diagrama de la arquitectura C4
+
+ #### Nivel 1: Diagrama de contexto
+
+ ```mermaid
+C4Context
+    title Sistema de Gestión de Usuarios - Diagrama de Contexto
+        
+    Person(user, "Usuario", "Usuario del sistema que administra las cuentas")
+    System(userManagement, "Sistema de Gestión de Usuarios", "Proporciona funcionalidad para gestionar usuarios y autenticación")
+    System_Ext(database, "Base de Datos PostgreSQL", "Almacena usuarios y datos de la aplicación")
+        
+    Rel_D(user, userManagement, "Utiliza", "HTTP/REST")
+    Rel_D(userManagement, database, "Lee y escribe datos", "SQL/TypeORM")
+        
+    UpdateRelStyle(user, userManagement, $textPosition="middle", $lineStyle="solid")
+    UpdateRelStyle(userManagement, database, $textPosition="middle", $lineStyle="solid")
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+
+ ```
+
+#### Nivel 2: Diagrama de Contenedores
+
+```mermaid
+C4Container
+    title Sistema de Gestión de Usuarios - Diagrama de Contenedores
+    
+    Person(user, "Usuario", "Usuario del sistema que administra las cuentas")
+    
+    Container_Boundary(api, "API de Gestión de Usuarios") {
+        Container(apiApp, "API NestJS", "TypeScript, NestJS", "Proporciona funcionalidad de gestión de usuarios y autenticación mediante REST API")
+        Container(auth, "Servicio de Autenticación", "JWT", "Maneja la autenticación y autorización de usuarios mediante tokens JWT")
+    }
+    
+    System_Ext(database, "Base de Datos PostgreSQL", "Almacena usuarios y datos de la aplicación")
+    
+    Rel(user, apiApp, "Utiliza", "HTTP/REST")
+    Rel(apiApp, auth, "Autentica y autoriza", "JWT")
+    Rel(apiApp, database, "Lee y escribe datos", "SQL/TypeORM")
+    
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+
+```
+
+#### Diagrama nivel 3: Diagrama de Componentes
+
+```mermaid
+C4Component
+    title Sistema de Gestión de Usuarios - Diagrama de Componentes (Simplificado)
+    
+    Container(database, "Base de Datos", "PostgreSQL", "Almacena usuarios")
+    
+    Container_Boundary(api, "API NestJS") {
+        Component(controllers, "Controllers", "NestJS REST", "Endpoints para usuarios y autenticación")
+        
+        Boundary(application, "Aplicación") {
+            Component(cqrs, "CQRS", "Command/Query Bus", "Gestiona comandos y consultas")
+            Component(ports, "Puertos", "Interfaces", "Contratos para servicios externos")
+        }
+        
+        Boundary(domain, "Dominio") {
+            Component(entities, "Entidades", "User", "Modelos de dominio con reglas de negocio")
+        }
+        
+        Boundary(infra, "Infraestructura") {
+            Component(repo, "Repositorios", "TypeORM", "Implementaciones de acceso a datos")
+            Component(services, "Servicios", "Notificación/Auth", "Implementaciones de servicios")
+        }
+    }
+    
+    Rel(controllers, cqrs, "Usa")
+    Rel(cqrs, entities, "Manipula")
+    Rel(cqrs, ports, "Usa")
+    Rel(ports, repo, "Implementado por")
+    Rel(ports, services, "Implementado por")
+    Rel(repo, database, "Accede")
+    
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+
+```
+
+#### Arquitectura Hexagonal
+
+```mermaid
+graph TD
+    subgraph "Adaptadores Primarios (UI)"
+        REST["REST Controllers"]
+    end
+    
+    subgraph "Aplicación"
+        CommandBus["Command Bus"]
+        QueryBus["Query Bus"]
+        
+        subgraph "Use Cases"
+            CreateUser["CreateUserHandler"]
+            UpdateUser["UpdateUserHandler"]
+            DeleteUser["DeleteUserHandler"]
+            GetUser["GetUserHandler"]
+        end
+        
+        subgraph "Puertos"
+            RP["UserRepositoryPort"]
+            NP["NotificationPort"]
+        end
+    end
+    
+    subgraph "Dominio"
+        User["User Entity"]
+        Events["Domain Events"]
+    end
+    
+    subgraph "Adaptadores Secundarios (Infraestructura)"
+        TypeORM["TypeOrmUserRepository"]
+        Console["ConsoleNotificationService"]
+        DB[(PostgreSQL)]
+    end
+    
+    %% Conexiones
+    REST --> |solicita| CommandBus & QueryBus
+    CommandBus --> |ejecuta| CreateUser & UpdateUser & DeleteUser
+    QueryBus --> |ejecuta| GetUser
+    
+    CreateUser & UpdateUser & DeleteUser & GetUser --> |usa| RP
+    CreateUser & UpdateUser --> |usa| NP
+    
+    CreateUser & UpdateUser & DeleteUser --> |maneja| User
+    CreateUser --> |publica| Events
+    
+    RP -.-> |implementado por| TypeORM
+    NP -.-> |implementado por| Console
+    
+    TypeORM --> |accede a| DB
+    
+    %% Estilo
+    classDef primary fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef application fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef domain fill:#bfb,stroke:#333,stroke-width:2px;
+    classDef secondary fill:#ffb,stroke:#333,stroke-width:2px;
+    classDef database fill:#bbb,stroke:#333,stroke-width:2px;
+    
+    class REST primary;
+    class CommandBus,QueryBus,CreateUser,UpdateUser,DeleteUser,GetUser,RP,NP application;
+    class User,Events domain;
+    class TypeORM,Console secondary;
+    class DB database;
+```
+
+# 📂 Estructura del Proyecto
 
 ```bash
 src/
@@ -46,14 +209,11 @@ src/
 └── main.ts                              # Punto de entrada de la aplicación
 ```
 
-
-# 3. Componentes del Sistema
-
-## 3.1 Modulo de Usuarios 
-
-La entidad User encapsula el compartamiento y las reglas del negocio
+# Componentes Principales
 
 ### Dominio User
+
+La entidad ```User``` encapsula el compartamiento y las reglas del negocio
 
 ```typescript
 export class User {
@@ -144,7 +304,7 @@ export class ConsoleNotificationService implements NotificationPort {
 
 
 
-# 3.2 Modulos de Autenticación
+#  Modulos de Autenticación
 
 ## Servicio de Autenticación
 
@@ -184,168 +344,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 }
 ```
 
-
-# 4. Diagrama de la Arquitectura
-
-```mermaid
-classDiagram
-    %% Dominio
-    namespace Domain {
-        class User {
-            +string id
-            +string email
-            +string password
-            +string firstName
-            +string lastName
-            +boolean isActive
-            +Date createdAt
-            +Date updatedAt
-            +update(params)
-            +deactivate()
-            +activate()
-            +getFullName()
-            +validate()
-        }
-
-        class UserCreatedEvent {
-            +string userId
-        }
-    }
-    
-    %% Aplicación - Puertos
-    namespace Application.Ports {
-        class UserRepositoryPort {
-            <>
-            +findAll() Promise~User[]~
-            +findById(id) Promise~User~
-            +findByEmail(email) Promise~User~
-            +create(user) Promise~User~
-            +update(user) Promise~User~
-            +delete(id) Promise~void~
-        }
-        
-        class NotificationPort {
-            <>
-            +sendUserCreatedNotification(user) Promise~void~
-            +sendUserUpdatedNotification(user) Promise~void~
-        }
-    }
-    
-    %% Aplicación - Comandos
-    namespace Application.Commands {
-        class CreateUserCommand {
-            +CreateUserDto createUserDto
-        }
-        
-        class UpdateUserCommand {
-            +string id
-            +UpdateUserDto updateUserDto
-        }
-        
-        class DeleteUserCommand {
-            +string id
-        }
-        
-        class CreateUserHandler {
-            +execute(command) Promise~User~
-        }
-        
-        class UpdateUserHandler {
-            +execute(command) Promise~User~
-        }
-        
-        class DeleteUserHandler {
-            +execute(command) Promise~void~
-        }
-    }
-    
-    %% Aplicación - Consultas
-    namespace Application.Queries {
-        class GetUserQuery {
-            +string id
-        }
-        
-        class GetUsersQuery {
-        }
-        
-        class GetUserHandler {
-            +execute(query) Promise~User~
-        }
-        
-        class GetUsersHandler {
-            +execute(query) Promise~User[]~
-        }
-    }
-    
-    %% Infraestructura - Adaptadores
-    namespace Infrastructure.Adapters {
-        class TypeOrmUserRepository {
-            +findAll() Promise~User[]~
-            +findById(id) Promise~User~
-            +findByEmail(email) Promise~User~
-            +create(user) Promise~User~
-            +update(user) Promise~User~
-            +delete(id) Promise~void~
-            -toDomain(entity) User
-            -toEntity(user) UserTypeormEntity
-        }
-        
-        class UserTypeormEntity {
-            +string id
-            +string email
-            +string password
-            +string firstName
-            +string lastName
-            +boolean isActive
-            +Date createdAt
-            +Date updatedAt
-        }
-        
-        class ConsoleNotificationService {
-            +sendUserCreatedNotification(user) Promise~void~
-            +sendUserUpdatedNotification(user) Promise~void~
-        }
-    }
-    
-    %% Infraestructura - Controladores
-    namespace Infrastructure.Controllers {
-        class UserController {
-            +create(createUserDto) Promise~UserResponseDto~
-            +findAll() Promise~UserResponseDto[]~
-            +findOne(id) Promise~UserResponseDto~
-            +update(id, updateUserDto) Promise~UserResponseDto~
-            +remove(id) Promise~void~
-        }
-    }
-    
-    %% Relaciones
-    UserRepositoryPort  CreateUserCommand : usa
-    UserController --> UpdateUserCommand : usa
-    UserController --> DeleteUserCommand : usa
-    UserController --> GetUserQuery : usa
-    UserController --> GetUsersQuery : usa
-    
-    CreateUserHandler --> UserRepositoryPort : usa
-    CreateUserHandler --> NotificationPort : usa
-    UpdateUserHandler --> UserRepositoryPort : usa
-    UpdateUserHandler --> NotificationPort : usa
-    DeleteUserHandler --> UserRepositoryPort : usa
-    
-    GetUserHandler --> UserRepositoryPort : usa
-    GetUsersHandler --> UserRepositoryPort : usa
-    
-    CreateUserHandler --> User : crea
-    UpdateUserHandler --> User : actualiza
-    
-    UserCreatedEvent  UserTypeormEntity : utiliza
-    TypeOrmUserRepository --> User : traduce a/desde
-```
-
-
 # Api Endpoints.
 
-
-## 5.1 Autenticación 
+## Autenticación 
 
 *Login* 
 
@@ -354,7 +355,6 @@ classDiagram
 POST /auth/login
 
 ```
-
 
 *Solicitud* 
 
@@ -488,19 +488,19 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 
 
-# 6. Guia de implementación
+# 6 Guia de implementación
 
 ## 6.1 Requisitos
 
 | Nombre | Version | 
 |------|----------------|
 | Node.js | >=  14.x| 
-| PostgreSQL |--|
-| npm o yarm | -- | 
+| PostgreSQL |Cualquiera|
+| npm o yarm | Ultima Versión | 
 
 
 
-## 6.2 Configuración del entorno
+## Configuración del entorno
 
 Se crea el archivo .env (ejemplo de archivo .env-example en el proyecto)
 
@@ -524,7 +524,7 @@ EMAIL_FROM=noreply@example.com
 ```
 
 
-## 6.3 Instalación y Ejecución
+## Instalación y Ejecución
 
 ```bash
 # Instalar dependencias
@@ -546,12 +546,10 @@ npm run start:prod
 
 ```
 
+## Ejecución en Sistemas Windows 
 
 
-## 6.4 Ejecución en Sistemas Windows 
-
-
-*Crear Usuario* 
+### *Crear Usuario* 
 
 ```powershell
 
@@ -568,7 +566,7 @@ Invoke-WebRequest -Uri "http://localhost:3000/users" -Method POST -ContentType "
 
 ```
 
-*Iniciar Sesión* 
+### *Iniciar Sesión* 
 
 ```powershell
 $body = @{
@@ -584,7 +582,7 @@ $global:token = $response.accessToken
 Write-Host "Token obtenido: $($token.Substring(0, [Math]::Min(20, $token.Length)))..." -ForegroundColor Green
 ```
 
-*Listar Usuarios* 
+### *Listar Usuarios* 
 
 
 ***Nota**: Llegados a este punto debes estar logueado como indica el paso anterior para que los demas pasos funcionen correctamente.
@@ -600,7 +598,7 @@ Invoke-WebRequest -Uri "http://localhost:3000/users" -Method GET -Headers $heade
 
 ```
 
-*Obtener detalles de los usuarios* 
+### *Obtener detalles de los usuarios* 
 
 
 ```powershell
@@ -644,7 +642,7 @@ catch {
 
 
 
-*Actualizar Usuarios* 
+### *Actualizar Usuarios* 
 
 ```powershell
 
@@ -738,7 +736,7 @@ catch {
 ```
 
 
-*Eliminar Usuarios* 
+### *Eliminar Usuarios* 
 
 
 ```powershell
@@ -790,8 +788,10 @@ else {
 
 *Script General de Funcionamiento* 
 
-***Nota** El codigo no tiene Verificaciones Implementadas
-Se crea un archivo con el nombre que desees y los ejecutas como powershell
+**Nota** El codigo no tiene Verificaciones Implementadas
+
+## 🧪 Probando la API
+Se crea un archivo ejemplo ```user-management.ps1``` y copia el contenido del archivo PowerShell proporcionado y ejecútalo en tu terminal.
 
 ```powershell
 
