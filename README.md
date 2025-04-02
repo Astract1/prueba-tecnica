@@ -379,7 +379,7 @@ POST /auth/login
 
 
 
-## 5.2 Usuarios
+## Usuarios
 
 *Crear Usuario* 
 
@@ -486,11 +486,9 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ```
 
+# Guia de implementación
 
-
-# 6 Guia de implementación
-
-## 6.1 Requisitos
+## Requisitos
 
 | Nombre | Version | 
 |------|----------------|
